@@ -21,7 +21,7 @@ Then use it:
 ```rust
 extern crate todotxt;
 
-use todotxt::TodoItem;
+use todotxt::Task;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
@@ -29,8 +29,8 @@ use std::io::BufReader;
 fn main() {
     let mut todo_file = BufReader::new(File::open("/home/kstep/todo/todo.txt").unwrap());
     for line in todo_file.lines() {
-        let todo_item: TodoItem = line.unwrap().parse().unwrap();
-        // Now work with TodoItem
+        let todo_item: Task = line.unwrap().parse().unwrap();
+        // Now work with Task
     }
 }
 ```
