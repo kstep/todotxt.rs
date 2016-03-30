@@ -32,7 +32,7 @@ impl FromStr for Recurrence {
 }
 
 #[derive(Debug, Eq, PartialEq, Default)]
-pub struct TodoItem {
+pub struct Task {
     pub line: String,
     pub subject: String,
     pub priority: u8,
@@ -48,9 +48,9 @@ pub struct TodoItem {
     pub tags: HashMap<String, String>,
 }
 
-impl FromStr for TodoItem {
+impl FromStr for Task {
     type Err = ();
-    fn from_str(mut s: &str) -> Result<TodoItem, ()> {
+    fn from_str(mut s: &str) -> Result<Task, ()> {
         let line = s.to_owned();
 
         // parse finish state
@@ -189,7 +189,7 @@ impl FromStr for TodoItem {
             _ => (),
         }
 
-        Ok(TodoItem {
+        Ok(Task {
             line: line,
             subject: subject,
             priority: priority,
@@ -209,12 +209,12 @@ impl FromStr for TodoItem {
 
 #[cfg(test)]
 mod test {
-    use super::{TodoItem, Recurrence, Date};
+    use super::{Task, Recurrence, Date};
 
     #[test]
     fn it_works() {
         let todo_item = "(A) 2016-03-24 22:00 сходить на занятие в @microfon rec:+1w due:2016-04-05 t:2016-04-05 at:20:00";
-        assert_eq!(todo_item.parse::<TodoItem>(), Ok(TodoItem {
+        assert_eq!(todo_item.parse::<Task>(), Ok(Task {
             line: todo_item.to_owned(),
             subject: todo_item[15..].to_owned(),
             create_date: Some(Date::from_ymd(2016, 3, 24)),
@@ -224,11 +224,11 @@ mod test {
             threshold_date: Some(Date::from_ymd(2016, 4, 5)),
             contexts: vec!["microfon".to_owned()],
             tags: vec![("at".to_owned(), "20:00".to_owned())].into_iter().collect(),
-            ..TodoItem::default()
+            ..Task::default()
         }));
 
         let todo_item = "2016-03-27 сменить загранпаспорт due:2020-08-14 t:2020-04-14 +документы";
-        assert_eq!(todo_item.parse::<TodoItem>(), Ok(TodoItem {
+        assert_eq!(todo_item.parse::<Task>(), Ok(Task {
             line: todo_item.to_owned(),
             subject: todo_item[11..].to_owned(),
             create_date: Some(Date::from_ymd(2016, 3, 27)),
@@ -236,11 +236,11 @@ mod test {
             due_date: Some(Date::from_ymd(2020, 8, 14)),
             threshold_date: Some(Date::from_ymd(2020, 4, 14)),
             projects: vec!["документы".to_owned()],
-            ..TodoItem::default()
+            ..Task::default()
         }));
 
         let todo_item = "x 2016-03-27 сменить загранпаспорт due:2020-08-14 t:2020-04-14 +документы";
-        assert_eq!(todo_item.parse::<TodoItem>(), Ok(TodoItem {
+        assert_eq!(todo_item.parse::<Task>(), Ok(Task {
             line: todo_item.to_owned(),
             subject: todo_item[13..].to_owned(),
             create_date: Some(Date::from_ymd(2016, 3, 27)),
@@ -249,7 +249,7 @@ mod test {
             threshold_date: Some(Date::from_ymd(2020, 4, 14)),
             projects: vec!["документы".to_owned()],
             finished: true,
-            ..TodoItem::default()
+            ..Task::default()
         }));
     }
 }
