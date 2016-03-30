@@ -97,8 +97,10 @@ impl FromStr for Task {
             finish_date = None;
         }
 
-        // Subject is the line with headers removed (priority, creation date and finish state).
-        let subject = s.to_owned();
+        let buf = s;
+
+        // Subject is the line with technical info removed (priority, creation date and finish state, tags).
+        let mut subject = Vec::new();
 
         // FSM to parse line for tags, contexts and projects.
 
@@ -122,62 +124,91 @@ impl FromStr for Task {
         let mut due_date = None;
         let mut recurrence = None;
 
-        for (i, c) in s.bytes().enumerate() {
-            state = match (c, state) {
+        for (i, c) in buf.bytes().enumerate() {
+            let new_state = match (c, state) {
                 (b'@', St::Init) => St::Ctx(i),
                 (b'+', St::Init) => St::Prj(i),
                 (b'#', St::Init) => St::Hash(i),
                 (b'a'...b'z', St::Init) => St::Tag0(i),
                 (b':', St::Tag0(j)) => St::Tag1(j, i),
+                (b' ', St::Tag0(_)) => St::Init,
                 (b' ', St::Ctx(j)) => {
-                    contexts.push(s[j + 1..i].to_owned());
+                    if i - j > 1 {
+                        contexts.push(buf[j + 1..i].to_owned());
+                    }
                     St::Init
                 }
                 (b' ', St::Prj(j)) => {
-                    projects.push(s[j + 1..i].to_owned());
+                    if i - j > 1 {
+                        projects.push(buf[j + 1..i].to_owned());
+                    }
                     St::Init
                 }
                 (b' ', St::Hash(j)) => {
-                    hashtags.push(s[j + 1..i].to_owned());
+                    if i - j > 1 {
+                        hashtags.push(buf[j + 1..i].to_owned());
+                    }
                     St::Init
                 }
                 (b' ', St::Tag1(j, k)) => {
-                    match &s[j..k] {
-                        "rec" => {
-                            recurrence = s[k + 1..i].parse::<Recurrence>().ok();
-                        }
-                        "due" => {
-                            due_date = s[k + 1..i].parse::<Date>().ok();
-                        }
-                        "t" => {
-                            threshold_date = s[k + 1..i].parse::<Date>().ok();
-                        }
-                        tag => {
-                            tags.insert(tag.to_owned(), s[k + 1..i].to_owned());
+                    if i - k > 1 {
+                        match &buf[j..k] {
+                            "rec" => {
+                                recurrence = buf[k + 1..i].parse::<Recurrence>().ok();
+                            }
+                            "due" => {
+                                due_date = buf[k + 1..i].parse::<Date>().ok();
+                            }
+                            "t" => {
+                                threshold_date = buf[k + 1..i].parse::<Date>().ok();
+                            }
+                            tag => {
+                                tags.insert(tag.to_owned(), buf[k + 1..i].to_owned());
+                            }
                         }
                     }
                     St::Init
                 }
                 _ => state,
             };
+
+            if new_state == St::Init {
+                match state {
+                    St::Tag0(j) | St::Hash(j) | St::Prj(j) | St::Ctx(j) => {
+                        subject.extend(&buf.as_bytes()[j..i]);
+                    }
+                    St::Init => subject.push(buf.as_bytes()[i]),
+                    _ => {}
+                }
+            }
+
+            state = new_state;
         }
 
         // Check final state, so tags at the end of line are also parsed.
         match state {
             St::Tag1(j, k) => {
-                tags.insert(s[j..k].to_owned(), s[k + 1..].to_owned());
+                tags.insert(buf[j..k].to_owned(), buf[k + 1..].to_owned());
             }
             St::Prj(j) => {
-                projects.push(s[j + 1..].to_owned());
+                projects.push(buf[j + 1..].to_owned());
+                subject.extend(&buf.as_bytes()[j..]);
             }
             St::Ctx(j) => {
-                contexts.push(s[j + 1..].to_owned());
+                contexts.push(buf[j + 1..].to_owned());
+                subject.extend(&buf.as_bytes()[j..]);
             }
             St::Hash(j) => {
-                hashtags.push(s[j + 1..].to_owned());
+                hashtags.push(buf[j + 1..].to_owned());
+                subject.extend(&buf.as_bytes()[j..]);
             }
-            _ => (),
+            St::Tag0(j) => {
+                subject.extend(&buf.as_bytes()[j..]);
+            }
+            _ => {}
         }
+
+        let subject = String::from_utf8(subject).unwrap_or_else(|_| s.to_owned());
 
         Ok(Task {
             line: line,
@@ -205,10 +236,12 @@ mod test {
     fn it_works() {
         let todo_item = "(A) 2016-03-24 22:00 сходить на занятие в @microfon rec:+1w \
                          due:2016-04-05 t:2016-04-05 at:20:00";
-        assert_eq!(todo_item.parse::<Task>(),
-                   Ok(Task {
+        let task = todo_item.parse::<Task>().unwrap();
+        println!("subj: {}", task.subject);
+        assert_eq!(task,
+                   Task {
                        line: todo_item.to_owned(),
-                       subject: todo_item[15..].to_owned(),
+                       subject: "22:00 сходить на занятие в @microfon".to_owned(),
                        create_date: Some(Date::from_ymd(2016, 3, 24)),
                        priority: 0,
                        recurrence: Some(Recurrence::Weekly(true, 1)),
@@ -217,26 +250,30 @@ mod test {
                        contexts: vec!["microfon".to_owned()],
                        tags: vec![("at".to_owned(), "20:00".to_owned())].into_iter().collect(),
                        ..Task::default()
-                   }));
+                   });
 
         let todo_item = "2016-03-27 сменить загранпаспорт due:2020-08-14 t:2020-04-14 +документы";
-        assert_eq!(todo_item.parse::<Task>(),
-                   Ok(Task {
+        let task = todo_item.parse::<Task>().unwrap();
+        println!("subj: {}", task.subject);
+        assert_eq!(task,
+                   Task {
                        line: todo_item.to_owned(),
-                       subject: todo_item[11..].to_owned(),
+                       subject: "сменить загранпаспорт +документы".to_owned(),
                        create_date: Some(Date::from_ymd(2016, 3, 27)),
                        priority: 26,
                        due_date: Some(Date::from_ymd(2020, 8, 14)),
                        threshold_date: Some(Date::from_ymd(2020, 4, 14)),
                        projects: vec!["документы".to_owned()],
                        ..Task::default()
-                   }));
+                   });
 
         let todo_item = "x 2016-03-27 сменить загранпаспорт due:2020-08-14 t:2020-04-14 +документы";
-        assert_eq!(todo_item.parse::<Task>(),
-                   Ok(Task {
+        let task = todo_item.parse::<Task>().unwrap();
+        println!("subj: {}", task.subject);
+        assert_eq!(task,
+                   Task {
                        line: todo_item.to_owned(),
-                       subject: todo_item[13..].to_owned(),
+                       subject: "сменить загранпаспорт +документы".to_owned(),
                        create_date: Some(Date::from_ymd(2016, 3, 27)),
                        priority: 26,
                        due_date: Some(Date::from_ymd(2020, 8, 14)),
@@ -244,6 +281,6 @@ mod test {
                        projects: vec!["документы".to_owned()],
                        finished: true,
                        ..Task::default()
-                   }));
+                   });
     }
 }
