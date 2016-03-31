@@ -13,7 +13,7 @@ Usage is very simple. First add it to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-todotxt = "^0.2"
+todotxt = "^0.3"
 ```
 
 Then use it:

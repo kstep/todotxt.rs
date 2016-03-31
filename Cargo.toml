@@ -6,7 +6,7 @@ license = "MIT/Apache-2.0"
 repository = "https://github.com/kstep/todotxt.rs"
 readme = "README.md"
 name = "todotxt"
-version = "0.2.1"
+version = "0.3.0"
 
 [dependencies]
 chrono = "0.2.21"

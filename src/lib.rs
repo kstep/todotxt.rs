@@ -2,6 +2,7 @@ extern crate chrono;
 
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::fmt::{self, Write};
 pub use chrono::NaiveDate as Date;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -33,9 +34,39 @@ impl FromStr for Recurrence {
     }
 }
 
+impl fmt::Display for Recurrence {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::Recurrence::*;
+        try!(f.write_str("rec:"));
+        match *self {
+            Daily(hard, num) => {
+                if hard { try!(f.write_char('+')); }
+                try!(write!(f, "{}d", num));
+            },
+            BDaily(hard, num) => {
+                if hard { try!(f.write_char('+')); }
+                try!(write!(f, "{}b", num));
+            },
+            Monthly(hard, num) => {
+                if hard { try!(f.write_char('+')); }
+                try!(write!(f, "{}m", num));
+            },
+            Weekly(hard, num) => {
+                if hard { try!(f.write_char('+')); }
+                try!(write!(f, "{}w", num));
+            },
+            Yearly(hard, num) => {
+                if hard { try!(f.write_char('+')); }
+                try!(write!(f, "{}y", num));
+            },
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Default)]
 pub struct Task {
-    pub line: String,
     pub subject: String,
     pub priority: u8,
     pub create_date: Option<Date>,
@@ -50,11 +81,45 @@ pub struct Task {
     pub tags: HashMap<String, String>,
 }
 
+impl fmt::Display for Task {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.finished {
+            try!(f.write_str("x "));
+            if let Some(ref finish_date) = self.finish_date {
+                try!(write!(f, "{} ", finish_date));
+            }
+        }
+
+        if self.priority < 26 {
+            try!(write!(f, "({}) ", (self.priority + b'A') as char));
+        }
+
+        if let Some(ref create_date) = self.create_date {
+            try!(write!(f, "{} ", create_date));
+        }
+
+        try!(f.write_str(&self.subject));
+
+        if let Some(ref date) = self.due_date {
+            try!(write!(f, " due:{}", date));
+        }
+        if let Some(ref date) = self.threshold_date {
+            try!(write!(f, " t:{}", date));
+        }
+        if let Some(ref rec) = self.recurrence {
+            try!(write!(f, " rec:{}", rec));
+        }
+        for (tag, value) in &self.tags {
+            try!(write!(f, " {}:{}", tag, value));
+        }
+
+        Ok(())
+    }
+}
+
 impl FromStr for Task {
     type Err = ();
     fn from_str(mut s: &str) -> Result<Task, ()> {
-        let line = s.to_owned();
-
         // parse finish state
         let (finished, mut finish_date) = if s.starts_with("x ") {
             s = &s[2..];
@@ -211,7 +276,6 @@ impl FromStr for Task {
         let subject = String::from_utf8(subject).unwrap_or_else(|_| s.to_owned());
 
         Ok(Task {
-            line: line,
             subject: subject,
             priority: priority,
             create_date: create_date,
@@ -237,10 +301,9 @@ mod test {
         let todo_item = "(A) 2016-03-24 22:00 сходить на занятие в @microfon rec:+1w \
                          due:2016-04-05 t:2016-04-05 at:20:00";
         let task = todo_item.parse::<Task>().unwrap();
-        println!("subj: {}", task.subject);
+        assert_eq!(task.subject, "22:00 сходить на занятие в @microfon");
         assert_eq!(task,
                    Task {
-                       line: todo_item.to_owned(),
                        subject: "22:00 сходить на занятие в @microfon".to_owned(),
                        create_date: Some(Date::from_ymd(2016, 3, 24)),
                        priority: 0,
@@ -254,10 +317,9 @@ mod test {
 
         let todo_item = "2016-03-27 сменить загранпаспорт due:2020-08-14 t:2020-04-14 +документы";
         let task = todo_item.parse::<Task>().unwrap();
-        println!("subj: {}", task.subject);
+        assert_eq!(task.subject, "сменить загранпаспорт +документы");
         assert_eq!(task,
                    Task {
-                       line: todo_item.to_owned(),
                        subject: "сменить загранпаспорт +документы".to_owned(),
                        create_date: Some(Date::from_ymd(2016, 3, 27)),
                        priority: 26,
@@ -269,10 +331,9 @@ mod test {
 
         let todo_item = "x 2016-03-27 сменить загранпаспорт due:2020-08-14 t:2020-04-14 +документы";
         let task = todo_item.parse::<Task>().unwrap();
-        println!("subj: {}", task.subject);
+        assert_eq!(task.subject, "сменить загранпаспорт +документы");
         assert_eq!(task,
                    Task {
-                       line: todo_item.to_owned(),
                        subject: "сменить загранпаспорт +документы".to_owned(),
                        create_date: Some(Date::from_ymd(2016, 3, 27)),
                        priority: 26,
