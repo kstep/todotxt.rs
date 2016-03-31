@@ -40,25 +40,35 @@ impl fmt::Display for Recurrence {
         try!(f.write_str("rec:"));
         match *self {
             Daily(hard, num) => {
-                if hard { try!(f.write_char('+')); }
+                if hard {
+                    try!(f.write_char('+'));
+                }
                 try!(write!(f, "{}d", num));
-            },
+            }
             BDaily(hard, num) => {
-                if hard { try!(f.write_char('+')); }
+                if hard {
+                    try!(f.write_char('+'));
+                }
                 try!(write!(f, "{}b", num));
-            },
+            }
             Monthly(hard, num) => {
-                if hard { try!(f.write_char('+')); }
+                if hard {
+                    try!(f.write_char('+'));
+                }
                 try!(write!(f, "{}m", num));
-            },
+            }
             Weekly(hard, num) => {
-                if hard { try!(f.write_char('+')); }
+                if hard {
+                    try!(f.write_char('+'));
+                }
                 try!(write!(f, "{}w", num));
-            },
+            }
             Yearly(hard, num) => {
-                if hard { try!(f.write_char('+')); }
+                if hard {
+                    try!(f.write_char('+'));
+                }
                 try!(write!(f, "{}y", num));
-            },
+            }
         }
 
         Ok(())
